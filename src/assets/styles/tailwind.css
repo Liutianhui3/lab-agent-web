@@ -1,0 +1,53 @@
+/* Tailwind CSS v4 入口：加载默认主题、基础样式和工具类。 */
+@import 'tailwindcss';
+
+/* dark: 工具类由 html.dark 控制，由主题切换逻辑统一设置。 */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Tailwind v4 使用 @theme 配置主题，对应旧版 tailwind.config.js 中的主题配置。
+ * 修改默认字体：调整下面 --font-sans 的字体及顺序，浏览器从左到右选择可用字体。
+ * 该配置作用于全局默认字体，也可以在元素上使用 font-sans 工具类。
+ * 如需新增主题工具类，可在这里添加变量，例如：
+ * --color-brand: #2563eb; → 使用 bg-brand、text-brand、border-brand。
+ */
+@theme {
+  --font-sans:
+    system-ui, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji',
+    -apple-system, 'Segoe UI', Roboto, Ubuntu, Cantarell, 'Noto Sans', sans-serif,
+    BlinkMacSystemFont, 'Helvetica Neue', Arial, 'PingFang SC', 'PingFang TC', 'PingFang HK',
+    'Microsoft YaHei', 'Microsoft JhengHei';
+}
+
+/* 基础样式放在 base 层，便于使用 Tailwind 工具类覆盖。 */
+@layer base {
+  :root {
+    /* 原生控件使用明亮主题；暗黑主题在下面的 .dark 中覆盖。 */
+    color-scheme: light;
+    /* 浅色主题：分别修改页面背景、默认文字、滚动条滑块颜色。 */
+    --page-background: #fafafa;
+    --page-text: #18181b;
+    --scrollbar-thumb: #d9d9d9;
+    --progress: #514def;
+  }
+
+  /*
+   * 深色主题：在下面修改暗黑模式下的对应颜色。
+   * useTheme.js 根据用户选择（明亮 / 暗黑 / 跟随系统）设置 html.dark。
+   * Tailwind 的 dark: 变体与此同步，例如 bg-white dark:bg-zinc-900。
+   * 元素如果自行设置了背景或文字颜色，需要用 dark: 配置其深色样式。
+   */
+  :root.dark {
+      color-scheme: dark;
+      --page-background: #141418;
+      --page-text: #f4f4f5;
+      --scrollbar-thumb: #52525b;
+      --progress: #514def;
+  }
+
+  /* 将主题变量应用到页面；滚动条变量由 main.less 中的样式使用。 */
+  body {
+    background-color: var(--page-background);
+    color: var(--page-text);
+  }
+}

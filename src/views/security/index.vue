@@ -190,8 +190,8 @@
     padding: 36px 40px 48px;
   }
   :global(.dark .security-page) {
-    --security-bg: #18191e;
-    --security-surface: #202127;
+    --security-bg: #000;
+    --security-surface: #19191b;
     --security-ink: #f0f1f8;
     --security-muted: #a8b3c8;
     --security-line: #3c4050;
@@ -226,7 +226,9 @@
     padding-bottom: 18px;
     margin-bottom: 30px;
   }
-  :global(.dark .security-intro) { border-bottom-color: #35343f; }
+  :global(.dark .security-intro) {
+    border-bottom-color: #35343f;
+  }
   h1 {
     margin: 0;
     color: #25232d;
@@ -235,7 +237,9 @@
     line-height: 1.4;
     letter-spacing: -0.02em;
   }
-  :global(.dark .security-intro h1) { color: #f2f0f8; }
+  :global(.dark .security-intro h1) {
+    color: #f2f0f8;
+  }
   .security-intro > p {
     color: var(--security-muted);
     font-size: 16px;
@@ -408,9 +412,16 @@
     color: #83d39a;
   }
   @media (max-width: 767px) {
-    .security-page { padding: 22px 16px 28px; }
-    .security-intro { margin-bottom: 20px; padding-bottom: 12px; }
-    h1 { font-size: 22px; }
+    .security-page {
+      padding: 22px 16px 28px;
+    }
+    .security-intro {
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+    }
+    h1 {
+      font-size: 22px;
+    }
   }
   @media (max-width: 600px) {
     .security-page {

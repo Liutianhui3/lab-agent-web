@@ -2,8 +2,6 @@
   import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
   import { useRoute } from 'vue-router'
   import {
-    Moon,
-    Sun,
     UserRound,
     PanelsTopLeft,
     Bot,
@@ -14,20 +12,16 @@
   } from 'lucide-vue-next'
   import logo from '@/assets/images/lab-agent.png'
   import gsap from 'gsap'
-  import { useTheme } from '@/composables/useTheme'
+  import ThemeModeSwitch from '@/components/ThemeModeSwitch.vue'
   import AccountMenu from './AccountMenu.vue'
-  import { menuRoutes } from '@/router/menu'
+  import { menuRoutes, canAccessRoute } from '@/router/menu'
+  import { useUserInfo } from '@/composables/useUserInfo'
 
   const route = useRoute()
-  const { theme, setTheme } = useTheme()
+  const { userInfo } = useUserInfo()
   const nav = ref(null)
   const indicator = ref(null)
   const activePath = computed(() => route.path)
-  const dark = computed(
-    () =>
-      theme.value === 'dark' ||
-      (theme.value === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
-  )
   const mobileItems = {
     home: { icon: PanelsTopLeft, label: '工作台' },
     assistant: { icon: Bot, label: 'AI助手' },
@@ -36,11 +30,11 @@
     reviews: { icon: ClipboardCheck, label: '预约审核' },
     users: { icon: Users, label: '用户管理' }
   }
-  const items = menuRoutes.map(({ path, name, meta }) => ({
-    path,
-    label: meta.title,
-    mobile: mobileItems[name]
-  }))
+  const items = computed(() =>
+    menuRoutes
+      .filter(item => canAccessRoute(item, userInfo.value.role))
+      .map(({ path, name, meta }) => ({ path, label: meta.title, mobile: mobileItems[name] }))
+  )
 
   function updateIndicator(animate = true) {
     if (!indicator.value || !nav.value) return
@@ -66,7 +60,7 @@
     updateIndicator(false)
   }
 
-  watch(activePath, async () => {
+  watch([activePath, items], async () => {
     await nextTick()
     nav.value?.querySelector('[aria-current="page"]')?.scrollIntoView({
       block: 'nearest',
@@ -85,16 +79,11 @@
     if (indicator.value) gsap.killTweensOf(indicator.value)
   })
 
-  function toggleTheme() {
-    setTheme(dark.value ? 'light' : 'dark')
-  }
-
-
 </script>
 
 <template>
   <header
-    class="relative z-30 shrink-0 border-b border-[#e9e8ef] bg-white dark:border-[#34353e] dark:bg-[#202127]"
+    class="relative z-30 shrink-0 border-b border-[#e9e8ef] bg-white dark:border-[#34353e] dark:bg-[#19191B]"
   >
     <div
       class="grid min-h-[68px] grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-4 sm:px-6 md:grid-cols-[auto_minmax(0,1fr)_auto] xl:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]"
@@ -143,15 +132,7 @@
       </nav>
 
       <div class="flex shrink-0 items-center justify-self-end gap-2 sm:gap-3">
-        <button
-          type="button"
-          :aria-label="dark ? '切换浅色主题' : '切换深色主题'"
-          @click="toggleTheme"
-          class="flex size-10 cursor-pointer items-center justify-center rounded-lg bg-transparent text-[#525665] transition-colors hover:text-[#514def] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#514def] dark:text-[#d0d1da] dark:hover:text-[#aaa8ff]"
-        >
-          <Sun v-if="dark" :size="18" aria-hidden="true" />
-          <Moon v-else :size="18" aria-hidden="true" />
-        </button>
+        <ThemeModeSwitch />
         <AccountMenu />
       </div>
     </div>
@@ -164,7 +145,12 @@
     border: 1px solid rgb(255 255 255 / 90%);
     background:
       radial-gradient(ellipse at 15% 0%, rgb(255 255 255 / 95%), transparent 55%),
-      linear-gradient(115deg, rgb(231 227 247 / 65%), rgb(246 245 252 / 42%) 48%, rgb(224 225 243 / 58%));
+      linear-gradient(
+        115deg,
+        rgb(231 227 247 / 65%),
+        rgb(246 245 252 / 42%) 48%,
+        rgb(224 225 243 / 58%)
+      );
     -webkit-backdrop-filter: blur(24px) saturate(165%);
     backdrop-filter: blur(24px) saturate(165%);
     box-shadow:
@@ -175,7 +161,12 @@
 
   .tab-indicator {
     border: 1px solid rgb(255 255 255 / 95%);
-    background: linear-gradient(155deg, rgb(255 255 255 / 95%), rgb(255 255 255 / 48%) 55%, rgb(238 235 255 / 65%));
+    background: linear-gradient(
+      155deg,
+      rgb(255 255 255 / 95%),
+      rgb(255 255 255 / 48%) 55%,
+      rgb(238 235 255 / 65%)
+    );
     -webkit-backdrop-filter: blur(16px) saturate(180%);
     backdrop-filter: blur(16px) saturate(180%);
     box-shadow:
@@ -190,12 +181,21 @@
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    background: linear-gradient(115deg, transparent 12%, rgb(255 255 255 / 65%) 35%, transparent 58%);
-    opacity: .55;
+    background: linear-gradient(
+      115deg,
+      transparent 12%,
+      rgb(255 255 255 / 65%) 35%,
+      transparent 58%
+    );
+    opacity: 0.55;
   }
 
-  .nav-item { -webkit-tap-highlight-color: transparent; }
-  .nav-item:hover { background: rgb(255 255 255 / 22%); }
+  .nav-item {
+    -webkit-tap-highlight-color: transparent;
+  }
+  .nav-item:hover {
+    background: rgb(255 255 255 / 22%);
+  }
 
   :global(.dark .header-nav) {
     border-color: rgb(218 216 255 / 27%);
@@ -210,14 +210,23 @@
 
   :global(.dark .tab-indicator) {
     border-color: rgb(236 233 255 / 53%);
-    background: linear-gradient(155deg, rgb(213 207 246 / 42%), rgb(151 143 185 / 30%) 48%, rgb(181 190 230 / 40%));
+    background: linear-gradient(
+      155deg,
+      rgb(213 207 246 / 42%),
+      rgb(151 143 185 / 30%) 48%,
+      rgb(181 190 230 / 40%)
+    );
     box-shadow:
       inset 0 2px 2px rgb(255 255 255 / 48%),
       inset 0 -2px 3px rgb(204 215 255 / 28%),
       0 4px 12px rgb(0 0 0 / 32%);
   }
-  :global(.dark .tab-indicator)::after { opacity: .36; }
-  :global(.dark .nav-item:hover) { background: rgb(255 255 255 / 5%); }
+  :global(.dark .tab-indicator)::after {
+    opacity: 0.36;
+  }
+  :global(.dark .nav-item:hover) {
+    background: rgb(255 255 255 / 5%);
+  }
 
   @media (prefers-reduced-transparency: reduce) {
     .header-nav {
@@ -239,7 +248,9 @@
   }
 
   @media (prefers-reduced-transparency: reduce) {
-    .tab-indicator::after { display: none; }
+    .tab-indicator::after {
+      display: none;
+    }
   }
 
   .header-nav::-webkit-scrollbar {

@@ -361,7 +361,7 @@
     --profile-ink: #25232d;
     --profile-muted: #726d82;
     --profile-line: #eeecf4;
-    --profile-accent: #7767ed;
+    --profile-accent: #514def;
     position: relative;
     isolation: isolate;
     background: #f7f9fc;
@@ -370,13 +370,13 @@
     color: var(--profile-ink);
   }
   :global(.dark .profile-page) {
-    background: #18191e;
-    --profile-surface: #202127;
-    --profile-input: #2a2b34;
+    background: #000;
+    --profile-surface: #19191b;
+    --profile-input: #0f0f10;
     --profile-ink: #f2f0f8;
     --profile-muted: #b6b1c6;
     --profile-line: #35343f;
-    --profile-accent: #a69aff;
+    --profile-accent: #514def;
   }
   .profile-wrap {
     position: relative;
@@ -517,9 +517,7 @@
     font-size: 15px;
     outline: none;
     caret-color: var(--profile-accent);
-    transition:
-      border-color 0.18s,
-      background-color 0.18s;
+    transition: border-color 0.18s;
   }
   .field input::placeholder {
     color: var(--profile-muted);
@@ -527,7 +525,6 @@
   }
   .field input:focus {
     border-color: var(--profile-accent);
-    background: var(--profile-surface);
   }
   .field input[aria-invalid='true'] {
     border-color: #d14359;
@@ -604,7 +601,7 @@
       background-color 0.18s;
   }
   .primary {
-    background: #7767ed;
+    background: #514def;
     color: #fff;
   }
   .primary:not(:disabled):hover {

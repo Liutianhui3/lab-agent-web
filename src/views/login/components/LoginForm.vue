@@ -1,7 +1,7 @@
 <script setup>
   import { ref } from 'vue'
   import { Eye, EyeOff, CircleAlert, UserRound, LockKeyhole } from 'lucide-vue-next'
-  import LoginThemeToggle from './LoginThemeToggle.vue'
+  import ThemeModeSwitch from '@/components/ThemeModeSwitch.vue'
 
   const account = defineModel('account', { type: String, default: '' })
   const password = defineModel('password', { type: String, default: '' })
@@ -17,9 +17,9 @@
 <template>
   <section
     aria-labelledby="login-title"
-    class="mt-4 flex flex-col rounded-2xl bg-white px-6 shadow-[0_2px_4px_rgba(26,27,31,0.04)] dark:bg-[#202127] lg:relative lg:mt-0 lg:min-h-svh lg:rounded-none lg:bg-transparent lg:px-14 lg:shadow-none lg:dark:bg-transparent xl:px-20"
+    class="mt-4 flex flex-col rounded-2xl bg-white px-6 shadow-[0_2px_4px_rgba(26,27,31,0.04)] dark:bg-[#19191B] lg:relative lg:mt-0 lg:min-h-svh lg:rounded-none lg:bg-transparent lg:px-14 lg:shadow-none lg:dark:bg-transparent xl:px-20"
   >
-    <LoginThemeToggle />
+    <ThemeModeSwitch placement="auth" />
     <div class="mx-auto w-full max-w-[440px] flex-1 content-center py-7 sm:py-9 lg:py-20">
       <div data-enter class="mb-9">
         <h2

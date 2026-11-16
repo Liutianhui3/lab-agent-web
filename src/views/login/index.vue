@@ -1,7 +1,7 @@
 <template>
   <main
     ref="root"
-    class="relative min-h-svh bg-[#faf9fe] px-5 pt-20 pb-8 lg:bg-white lg:p-0 text-[#1a1b1f] selection:bg-[#eeecfe] selection:text-[#2a238a] dark:bg-[#18191e] dark:text-[#f4f3f8] lg:grid lg:grid-cols-[7fr_5fr]"
+    class="relative min-h-svh bg-[#faf9fe] px-5 pt-20 pb-8 lg:bg-white lg:p-0 text-[#1a1b1f] selection:bg-[#eeecfe] selection:text-[#2a238a] dark:bg-[#000] dark:text-[#f4f3f8] lg:grid lg:grid-cols-[7fr_5fr]"
   >
     <a
       href="#login-account"

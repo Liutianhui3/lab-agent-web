@@ -1,7 +1,7 @@
 <template>
   <main
     ref="root"
-    class="relative min-h-svh bg-[#faf9fe] px-5 pt-20 pb-8 text-[#1a1b1f] selection:bg-[#eeecfe] selection:text-[#2a238a] dark:bg-[#18191e] dark:text-[#f4f3f8] lg:grid lg:grid-cols-[7fr_5fr] lg:bg-white lg:p-0"
+    class="relative min-h-svh bg-[#faf9fe] px-5 pt-20 pb-8 text-[#1a1b1f] selection:bg-[#eeecfe] selection:text-[#2a238a] dark:bg-[#000] dark:text-[#f4f3f8] lg:grid lg:grid-cols-[7fr_5fr] lg:bg-white lg:p-0"
   >
     <a
       href="#register-account"
@@ -12,9 +12,9 @@
     <LoginVisual />
     <section
       aria-labelledby="register-title"
-      class="mt-4 flex flex-col rounded-2xl bg-white px-6 shadow-[0_2px_4px_rgba(26,27,31,0.04)] dark:bg-[#202127] lg:relative lg:mt-0 lg:min-h-svh lg:rounded-none lg:bg-transparent lg:px-14 lg:shadow-none lg:dark:bg-transparent xl:px-20"
+      class="mt-4 flex flex-col rounded-2xl bg-white px-6 shadow-[0_2px_4px_rgba(26,27,31,0.04)] dark:bg-[#19191B] lg:relative lg:mt-0 lg:min-h-svh lg:rounded-none lg:bg-transparent lg:px-14 lg:shadow-none lg:dark:bg-transparent xl:px-20"
     >
-      <LoginThemeToggle />
+      <ThemeModeSwitch placement="auth" />
       <div class="mx-auto w-full max-w-[440px] flex-1 content-center py-7 sm:py-9 lg:py-20">
         <div data-enter class="mb-8">
           <h2
@@ -139,7 +139,7 @@
   import { RouterLink } from 'vue-router'
   import { UserRound, Mail, LockKeyhole } from 'lucide-vue-next'
   import LoginVisual from '@/views/login/components/LoginVisual.vue'
-  import LoginThemeToggle from '@/views/login/components/LoginThemeToggle.vue'
+  import ThemeModeSwitch from '@/components/ThemeModeSwitch.vue'
   import { useLoginMotion } from '@/views/login/composables/useLoginMotion'
   import RegisterField from './components/RegisterField.vue'
   import { register } from '@/api/auth'

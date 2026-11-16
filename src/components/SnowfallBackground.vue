@@ -7,7 +7,9 @@
   const canvas = ref(null)
   let context, resizeObserver, themeObserver, motionPreference, frame
   let flakes = []
-  let width = 0, height = 0, previousTime = 0
+  let width = 0,
+    height = 0,
+    previousTime = 0
   let dark = false
   const random = (min, max) => min + Math.random() * (max - min)
 
@@ -20,18 +22,25 @@
     canvas.value.height = Math.round(height * ratio)
     context.setTransform(ratio, 0, 0, ratio, 0, 0)
     flakes = Array.from({ length: width < 600 ? 60 : 100 }, () => ({
-      x: random(0, width), y: random(0, height), radius: random(.2, 5),
-      speed: random(30, 45), drift: random(-15, 15), opacity: random(.5, 1)
+      x: random(0, width),
+      y: random(0, height),
+      radius: random(0.2, 5),
+      speed: random(30, 45),
+      drift: random(-15, 15),
+      opacity: random(0.5, 1)
     }))
     draw(0)
   }
   function draw(delta) {
     context.clearRect(0, 0, width, height)
-    context.fillStyle = dark ? '#add8e6' : '#514def'
+    context.fillStyle = dark ? '#FCD34D' : '#514def'
     for (const flake of flakes) {
       flake.y += flake.speed * delta
       flake.x += flake.drift * delta
-      if (flake.y > height + flake.radius) { flake.y = -flake.radius; flake.x = random(0, width) }
+      if (flake.y > height + flake.radius) {
+        flake.y = -flake.radius
+        flake.x = random(0, width)
+      }
       if (flake.x > width + flake.radius) flake.x = -flake.radius
       if (flake.x < -flake.radius) flake.x = width + flake.radius
       context.globalAlpha = flake.opacity
@@ -42,7 +51,7 @@
     context.globalAlpha = 1
   }
   function animate(time) {
-    draw(previousTime ? Math.min((time - previousTime) / 1000, .05) : 0)
+    draw(previousTime ? Math.min((time - previousTime) / 1000, 0.05) : 0)
     previousTime = time
     frame = requestAnimationFrame(animate)
   }
@@ -63,7 +72,10 @@
       dark = document.documentElement.classList.contains('dark')
       draw(0)
     })
-    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+    themeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    })
     motionPreference.addEventListener('change', syncAnimation)
     document.addEventListener('visibilitychange', syncAnimation)
     resize()
@@ -83,5 +95,13 @@
 </template>
 
 <style scoped>
-  .snowfall-background { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: -1; border-radius: inherit; }
+  .snowfall-background {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: -1;
+    border-radius: inherit;
+  }
 </style>

@@ -1,21 +1,21 @@
 # Lab Agent Web
 
-Lab Agent 实验室预约系统的 Web 前端，基于 Vue 3 和 Vite 构建。目前主要完成账号认证、个人资料及安全设置页面，业务管理模块仍在开发中。后端服务需单独运行，本目录不包含后端实现。
+Lab Agent 实验室预约系统的 Web 前端，基于 Vue 3 和 Vite 构建，包含账号认证、个人资料、安全设置和实验室管理页面。后端服务需单独运行，本目录不包含后端实现。
 
 ## 功能状态
 
-| 模块         | 路径            | 当前状态                                       |
-| ------------ | --------------- | ---------------------------------------------- |
-| 登录         | `/login`        | 用户名与密码登录、表单校验、登录状态保存       |
-| 注册         | `/register`     | 用户名、邮箱和密码校验，注册成功后手动返回登录 |
-| 个人资料     | `/profile`      | 获取及修改资料、头像上传、重置未保存修改       |
-| 安全与访问   | `/security`     | 校验当前密码与新密码，提交密码修改             |
-| 首页工作台   | `/home`         | 已注册路由，页面为空                           |
-| AI 智能助手  | `/assistant`    | 已注册路由，页面为空                           |
-| 实验室管理   | `/laboratories` | 已注册路由，页面为空                           |
-| 设备列表管理 | `/equipment`    | 已注册路由，页面为空                           |
-| 预约审核     | `/reviews`      | 已注册路由，页面为空                           |
-| 用户管理     | `/users`        | 已注册路由，页面为空                           |
+| 模块         | 路径            | 当前状态                                               |
+| ------------ | --------------- | ------------------------------------------------------ |
+| 登录         | `/login`        | 用户名与密码登录、表单校验、登录状态保存               |
+| 注册         | `/register`     | 用户名、邮箱和密码校验，注册成功后手动返回登录         |
+| 个人资料     | `/profile`      | 获取及修改资料、头像上传、重置未保存修改               |
+| 安全与访问   | `/security`     | 校验当前密码与新密码，提交密码修改                     |
+| 首页工作台   | `/home`         | 已注册路由，页面为空                                   |
+| AI 智能助手  | `/assistant`    | 已注册路由，页面为空                                   |
+| 实验室管理   | `/laboratories` | 管理员专用；分页查询、筛选、统计、新增、编辑、状态切换与删除 |
+| 设备列表管理 | `/equipment`    | 已注册路由，页面为空                                   |
+| 预约审核     | `/reviews`      | 已注册路由，页面为空                                   |
+| 用户管理     | `/users`        | 管理员专用；用户管理页面                               |
 
 公共能力包括响应式布局、浅色/深色/跟随系统主题、登录路由守卫和账户菜单。账户菜单中的机时账户余额为静态示例数据；当前登出操作清理本地登录状态，不调用后端登出接口。
 
@@ -79,15 +79,27 @@ VITE_API_BASE_URL=
 
 接口定义位于 `src/api/`，统一请求封装位于 `src/utils/request.js`，请求超时为 60 秒。
 
-| 方法 | 路径                    | 用途                                                       |
-| ---- | ----------------------- | ---------------------------------------------------------- |
-| POST | `/api/v1/auth/register` | 注册，字段为 `username`、`email`、`password`               |
-| POST | `/api/v1/auth/login`    | 登录，字段为 `username`、`password`                        |
-| POST | `/api/v1/auth/logout`   | 已封装，当前账户菜单未调用                                 |
-| GET  | `/api/v1/user/info`     | 获取当前用户资料                                           |
-| POST | `/api/v1/user/update`   | 更新 `name`、`username`、`email`、`phone`、`avatar`        |
-| POST | `/api/v1/user/password` | 修改密码，字段为 `old_password`、`new_password`            |
-| POST | `/api/v1/files/upload`  | 上传头像，使用 FormData，字段为 `file` 和 `purpose=avatar` |
+| 方法   | 路径                     | 用途                                                |
+| ------ | ------------------------ | --------------------------------------------------- |
+| POST   | `/api/v1/auth/register`  | 注册，字段为 `username`、`email`、`password`        |
+| POST   | `/api/v1/auth/login`     | 登录，字段为 `username`、`password`                 |
+| POST   | `/api/v1/auth/logout`    | 已封装，当前账户菜单未调用                          |
+| GET    | `/api/v1/user/info`      | 获取当前用户资料                                    |
+| POST   | `/api/v1/user/update`    | 更新用户资料                                        |
+| POST   | `/api/v1/user/password`  | 修改密码                                            |
+| GET    | `/api/v1/lab/page`       | 管理员分页查询实验室和全局统计                      |
+| POST   | `/api/v1/lab/create`     | 管理员新增实验室                                    |
+| PUT    | `/api/v1/lab/{lab_id}`   | 管理员部分更新实验室                                |
+| DELETE | `/api/v1/lab/{lab_id}`   | 管理员删除已关闭的实验室                            |
+| POST   | `/api/v1/files/upload`   | 上传头像或实验室封面，使用 FormData                 |
+
+### 实验室管理接口
+
+实验室管理页面只对管理员显示，普通用户直接访问 `/laboratories` 时会进入无权限页面。前端路由限制用于控制页面入口，后端实验室接口同样要求管理员 Bearer Token。
+
+分页接口接受 `page`、`size`、`keyword` 和 `status` 参数。响应中的统计字段 `global_total`、`open_count`、`closed_count`、`total_capacity` 使用 snake_case，统计范围为全部实验室，不随列表筛选改变。实验室条目字段由后端以 camelCase 返回（例如 `labCode`、`openTime`、`closeTime`），前端 API 层会转换为页面使用的 snake_case 字段。新增和更新请求字段使用 snake_case。
+
+封面上传复用 `/api/v1/files/upload`，请求字段为 `file` 和 `purpose=avatar`；从响应 `data.url` 读取图片地址，再随实验室新增或更新请求提交。开发环境下 `/api` 和 `/uploads` 通过 Vite 代理转发到本机后端。
 
 普通 JSON 响应满足 `code === 200`、`code === 0` 或 `msg === 'success'` 中任一条件即视为成功，业务数据从 `data` 读取。登录响应示例：
 
@@ -106,7 +118,7 @@ VITE_API_BASE_URL=
 
 登录页要求 `data.accessToken` 为非空字符串且 `data.user.id` 有效。资料更新响应需返回含 `id` 的用户对象；头像上传响应需包含 `data.url`。
 
-登录令牌和用户信息分别保存在 localStorage 的 `Access-Token`、`User-Info` 中。请求自动携带 `Authorization: Bearer <token>`；已有令牌时收到 HTTP 或业务状态码 401，会清理登录状态并跳转。前端路由守卫仅检查是否存在非空令牌，目前未按学生/管理员角色划分页面访问权限，接口授权应由后端执行。
+登录令牌和用户信息分别保存在 localStorage 的 `Access-Token`、`User-Info` 中。请求自动携带 `Authorization: Bearer <token>`；已有令牌时收到 HTTP 或业务状态码 401，会清理登录状态并跳转。前端路由守卫会按用户角色限制管理员专用页面；后端仍需独立执行接口授权。
 
 注册和修改密码要求 8–20 位，包含大写字母、小写字母和数字，可使用英文符号，不允许空白或中文。头像仅接受 JPG/PNG，大小不超过 5 MB；上传后还需保存资料才能提交头像地址。
 

@@ -73,7 +73,7 @@
       <span class="max-w-[100px] truncate text-sm leading-5 font-medium sm:max-w-[150px]">{{ name }}</span>
     </button>
     <Transition name="account">
-      <section v-if="open" id="account-panel" aria-label="账户选项" class="account-panel absolute right-0 top-full z-50 mt-3 w-[304px] max-w-[calc(100vw-32px)] rounded-[22px] border border-white/80 bg-white/95 p-2.5 text-[#484653] shadow-[0_16px_48px_rgba(32,24,60,0.16)] backdrop-blur-xl dark:border-white/10 dark:bg-[#25252e]/95 dark:text-[#d5d3df]">
+      <section v-if="open" id="account-panel" aria-label="账户选项" class="account-panel absolute right-0 top-full z-50 mt-3 w-[304px] max-w-[calc(100vw-32px)] rounded-[22px] border border-white/80 bg-white/95 p-2.5 text-[#484653] shadow-[0_16px_48px_rgba(32,24,60,0.16)] backdrop-blur-xl dark:border-white/10 dark:bg-[#19191B] dark:text-[#d5d3df]">
         <div class="flex items-center gap-3 rounded-2xl bg-transparent p-3 shadow-none">
           <span class="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#514def] text-white"><img v-if="showAvatar" :src="avatar" alt="" class="size-full object-cover" @error="failedAvatar = avatar" /><UserRound v-else :size="24" aria-hidden="true" /></span>
           <div class="min-w-0"><p class="truncate text-base font-semibold text-[#25232d] dark:text-white">{{ name }}</p><p class="mt-1 text-xs text-[#716d80] dark:text-[#b6b2c4]">{{ role }}</p></div>

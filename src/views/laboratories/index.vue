@@ -24,6 +24,15 @@
   } from 'lucide-vue-next'
   import { queryLabs, removeLab, updateLab } from '@/api/lab'
   import LabDrawer from './LabDrawer.vue'
+  import { useRouter } from 'vue-router'
+  const router = useRouter()
+  function viewEquipment(lab) {
+    router.push({ name: 'laboratory-list', query: { status: 'detail', lab_code: lab.lab_code } })
+  }
+  import { useUserInfo } from '@/composables/useUserInfo'
+  const props = defineProps({ readOnly: { type: Boolean, default: false } })
+  const { userInfo } = useUserInfo()
+  const canManage = computed(() => !props.readOnly && userInfo.value.role === 'admin')
   const items = ref([]),
     total = ref(0),
     page = ref(1),
@@ -88,6 +97,7 @@
     load()
   }
   async function toggle(lab) {
+    if (!canManage.value) return
     menu.value = null
     try {
       await updateLab(lab.id, { ...lab, status: lab.status === 1 ? 0 : 1 })
@@ -98,12 +108,14 @@
     }
   }
   async function askDelete(lab) {
+    if (!canManage.value) return
     menu.value = null
     deletion.value = lab
     await nextTick()
     confirmDialog.value.showModal()
   }
   async function destroy() {
+    if (!canManage.value) return
     deleting.value = true
     try {
       await removeLab(deletion.value.id)
@@ -130,8 +142,8 @@
   <section class="labs-page" @click="menu = null">
     <div class="labs-wrap">
       <header class="page-heading">
-        <h1>实验室管理</h1>
-        <button class="primary" @click="drawer.open()">
+        <h1>{{ canManage ? '实验室管理' : '实验室列表' }}</h1>
+        <button v-if="canManage" class="primary" @click="drawer.open()">
           <Plus :size="18" />
           新增实验室
         </button>
@@ -252,7 +264,7 @@
         <p>{{ loadError }}</p>
         <button class="secondary" @click="load">重试</button>
       </div>
-      <div v-else-if="!items.length && !loading" class="empty">
+      <div v-else-if="!items.length && !loading" class="empty empty-fill">
         <span>
           <SearchX v-if="keyword || status" :size="34" />
           <Building2 v-else :size="34" />
@@ -262,11 +274,13 @@
           {{
             keyword || status
               ? '试试其他关键词，或清除筛选条件。'
-              : '新增第一个实验室，开始管理空间和开放时间。'
+              : canManage
+                ? '新增第一个实验室，开始管理空间和开放时间。'
+                : '暂无可查看的实验室，请稍后再来。'
           }}
         </p>
         <button v-if="keyword || status" class="secondary" @click="clear">清除筛选</button>
-        <button v-else class="primary" @click="drawer.open()">
+        <button v-else-if="canManage" class="primary" @click="drawer.open()">
           <Plus :size="17" />
           新增实验室
         </button>
@@ -317,9 +331,9 @@
               </span>
             </div>
             <p class="description">{{ lab.description || '暂无实验室描述' }}</p>
-            <footer>
+            <footer v-if="canManage">
               <span>{{ lab.status === 1 ? '实验空间开放使用' : '实验空间暂停开放' }}</span>
-              <div class="card-actions">
+              <div v-if="canManage" class="card-actions">
                 <button class="secondary" @click="drawer.open(lab)">
                   <Pencil :size="15" />
                   编辑
@@ -345,6 +359,10 @@
                   </div>
                 </div>
               </div>
+            </footer>
+            <footer v-else class="browse-actions">
+              <button type="button" class="secondary" @click="viewEquipment(lab)">查看设备</button>
+              <button type="button" class="primary">选择预约</button>
             </footer>
           </div>
         </article>
@@ -410,8 +428,9 @@
         </div>
       </footer>
     </div>
-    <LabDrawer ref="drawer" @saved="saved" />
+    <LabDrawer v-if="canManage" ref="drawer" @saved="saved" />
     <dialog
+      v-if="canManage"
       ref="confirmDialog"
       class="delete-confirm"
       @click="
@@ -445,14 +464,27 @@
     --lab-line: #eeecf4;
     --lab-accent: #514def;
     min-height: 100%;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
     padding: 32px 40px 40px;
     background: var(--lab-bg);
     color: var(--lab-ink);
     font-size: 14px;
   }
+  :global(#main-content:has(.labs-page)) {
+    scrollbar-width: none;
+  }
+  :global(#main-content:has(.labs-page)::-webkit-scrollbar) {
+    display: none;
+  }
   .labs-wrap {
     max-width: 1440px;
-    margin: auto;
+    width: 100%;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    margin: 0 auto;
   }
   :global(html.dark .labs-page) {
     --lab-bg: #000;
@@ -928,6 +960,15 @@
     font-size: 11px;
     color: var(--lab-muted);
   }
+  .card-body .browse-actions {
+    gap: 12px;
+  }
+  .browse-actions button {
+    flex: 1;
+    min-width: 0;
+    min-height: 44px;
+    font-size: 13px;
+  }
   .card-actions {
     display: flex;
     gap: 8px;
@@ -1117,6 +1158,10 @@
     flex-direction: column;
     padding: 30px;
     text-align: center;
+  }
+  .empty-fill {
+    flex: 1;
+    min-height: 360px;
   }
   .empty > span {
     background: var(--lab-input);

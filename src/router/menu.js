@@ -10,6 +10,12 @@ export const menuRoutes = [
     meta: { title: 'AI 智能助手' }
   },
   {
+    path: '/laboratory-list',
+    name: 'laboratory-list',
+    component: () => import('@/views/laboratories/LaboratoryList.vue'),
+    meta: { title: '实验室列表', roles: ['student'] }
+  },
+  {
     path: '/laboratories',
     name: 'laboratories',
     component: () => import('@/views/laboratories/index.vue'),
@@ -19,7 +25,7 @@ export const menuRoutes = [
     path: '/equipment',
     name: 'equipment',
     component: () => import('@/views/equipment/index.vue'),
-    meta: { title: '设备列表管理' }
+    meta: { title: '设备列表管理', roles: ['admin'] }
   },
   {
     path: '/reviews',

@@ -41,6 +41,15 @@ export async function queryLabs(params = {}) {
   }
 }
 
+export async function queryLabInfo(labCode) {
+  const response = await request({
+    method: 'GET',
+    url: '/api/v1/lab/info',
+    params: { lab_code: labCode }
+  })
+  return fromApi(response.data)
+}
+
 export function createLab(lab) {
   return request({ method: 'POST', url: '/api/v1/lab/create', data: toApi(lab) })
 }

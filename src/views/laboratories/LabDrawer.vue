@@ -41,6 +41,8 @@
     animation?.kill()
     opener = document.activeElement
     editing.value = !!lab
+    // Remove edit-only fields (especially id) before opening a new form.
+    for (const key of Object.keys(form)) delete form[key]
     Object.assign(form, initial(), lab || {})
     error.value = ''
     fields.value = {}

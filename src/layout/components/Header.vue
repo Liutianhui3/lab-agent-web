@@ -26,6 +26,7 @@
     home: { icon: PanelsTopLeft, label: '工作台' },
     assistant: { icon: Bot, label: 'AI助手' },
     laboratories: { icon: FlaskConical, label: '实验室' },
+    'laboratory-list': { icon: FlaskConical, label: '实验室列表' },
     equipment: { icon: Microscope, label: '设备' },
     reviews: { icon: ClipboardCheck, label: '预约审核' },
     users: { icon: Users, label: '用户管理' }

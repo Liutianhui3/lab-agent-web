@@ -34,7 +34,14 @@
   const items = computed(() =>
     menuRoutes
       .filter(item => canAccessRoute(item, userInfo.value.role))
-      .map(({ path, name, meta }) => ({ path, label: meta.title, mobile: mobileItems[name] }))
+      .map(({ path, name, meta }) => {
+        const label = name === 'reviews' && userInfo.value.role !== 'admin' ? '我的预约' : meta.title
+        return {
+          path,
+          label,
+          mobile: name === 'reviews' ? { ...mobileItems[name], label } : mobileItems[name]
+        }
+      })
   )
 
   function updateIndicator(animate = true) {

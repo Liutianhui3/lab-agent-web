@@ -27,6 +27,7 @@
   import { queryEquipment, removeEquipment, updateEquipment } from '@/api/equipment'
   import { queryLabInfo, queryLabs } from '@/api/lab'
   import EquipmentDrawer from './EquipmentDrawer.vue'
+  import ReservationDialog from '@/components/ReservationDialog.vue'
   import { avatarUrl } from '@/utils/avatar'
 
   const props = defineProps({
@@ -91,6 +92,12 @@
   const confirmDialog = ref(null)
   const notice = ref('')
   const actionError = ref('')
+  const reservationOpen = ref(false)
+  const reservationEquipment = ref(null)
+  function openReservation(equipment = null) {
+    reservationEquipment.value = equipment
+    reservationOpen.value = true
+  }
   const sizeMenuOpen = ref(false)
   const statusControl = ref(null)
   const statusIndicator = ref({})
@@ -648,7 +655,7 @@
                   <strong>{{ equipment.quantity }}</strong>
                 </span>
                 <div v-if="readOnly && equipment.status === 1" class="equipment-actions">
-                  <button class="primary-button" type="button" aria-disabled="true">预约</button>
+                  <button class="primary-button" type="button" @click="openReservation(equipment)">预约</button>
                 </div>
                 <div v-else-if="!readOnly" class="equipment-actions">
                   <button class="edit-button" @click="openEdit(equipment)">
@@ -736,6 +743,7 @@
     </div>
 
     <EquipmentDrawer v-if="!readOnly" ref="drawer" :key="labs.length" @saved="saved" />
+    <ReservationDialog v-if="readOnly && labInfo" :open="reservationOpen" :lab="labInfo" :equipment="reservationEquipment" @close="reservationOpen = false" @success="notice = '预约提交成功，等待审核'" />
     <dialog
       v-if="!readOnly"
       ref="confirmDialog"

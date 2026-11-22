@@ -24,6 +24,7 @@
   } from 'lucide-vue-next'
   import { queryLabs, removeLab, updateLab } from '@/api/lab'
   import LabDrawer from './LabDrawer.vue'
+  import ReservationDialog from '@/components/ReservationDialog.vue'
   import { useRouter } from 'vue-router'
   const router = useRouter()
   function viewEquipment(lab) {
@@ -48,6 +49,9 @@
     deleting = ref(false),
     confirmDialog = ref(null)
   const sizeMenu = ref(false)
+  const reservationOpen = ref(false)
+  const reservationLab = ref(null)
+  function openReservation(lab) { reservationLab.value = lab; reservationOpen.value = true }
   const stats = ref({ total: 0, open: 0, closed: 0, capacity: 0 })
   const loadError = ref('')
   const pages = computed(() => Math.max(1, Math.ceil(total.value / size.value)))
@@ -362,7 +366,7 @@
             </footer>
             <footer v-else class="browse-actions">
               <button type="button" class="secondary" @click="viewEquipment(lab)">查看设备</button>
-              <button type="button" class="primary">选择预约</button>
+              <button type="button" class="primary" @click="openReservation(lab)">选择预约</button>
             </footer>
           </div>
         </article>
@@ -428,6 +432,7 @@
         </div>
       </footer>
     </div>
+    <ReservationDialog :open="reservationOpen" :lab="reservationLab" @close="reservationOpen = false" @success="notice = '预约提交成功，等待审核'" />
     <LabDrawer v-if="canManage" ref="drawer" @saved="saved" />
     <dialog
       v-if="canManage"

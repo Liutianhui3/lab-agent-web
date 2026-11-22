@@ -72,7 +72,7 @@ export function createRouterGuard(router) {
       route => route.path === to.path && canAccessRoute(route, userInfo.value.role)
     )
     if (isAuthorizedPath && !to.matched.some(record => record.name === layoutRouteName)) {
-      return { path: to.fullPath, replace: true }
+      return { path: to.path, query: to.query, hash: to.hash, replace: true }
     }
 
     return true

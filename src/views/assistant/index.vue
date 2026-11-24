@@ -30,6 +30,7 @@
   import AdminActionCard from './components/AdminActionCard.vue'
   import ReservationCard from './components/ReservationCard.vue'
   import { useUserInfo } from '@/composables/useUserInfo'
+  import { createMessageId } from '@/utils/messageId'
   import {
     listConversations,
     getMessages,
@@ -378,9 +379,9 @@
     draft.value = ''
     expanded.value = false
     busy.value = true
-    const user = { id: crypto.randomUUID(), role: 'user', content }
+    const user = { id: createMessageId(), role: 'user', content }
     const assistant = {
-      id: crypto.randomUUID(),
+      id: createMessageId(),
       role: 'assistant',
       content: '',
       pending: true,

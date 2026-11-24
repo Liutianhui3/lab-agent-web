@@ -7,29 +7,28 @@
     Search,
     Trash2,
     Ellipsis,
-    ArrowUp,
     ArrowDown,
-    Square,
-    Maximize2,
-    Minimize2,
     Copy,
     Volume2,
     VolumeX,
+    ChevronDown,
     ThumbsUp,
     ThumbsDown,
     Check,
     Download,
     X,
     MessageSquare,
-    MessagesSquare,
-    Brain
+    MessagesSquare
   } from 'lucide-vue-next'
   import MarkdownIt from 'markdown-it'
   import claudeLogo from '@/assets/images/claude.svg'
   import aiLogo from '@/assets/images/ai-logo.svg'
   import SnowfallBackground from '@/components/SnowfallBackground.vue'
+  import ChatComposer from '@/components/ChatComposer.vue'
   import StreamingMarkdown from '@/components/StreamingMarkdown.vue'
   import ThinkingIndicator from '@/components/ThinkingIndicator.vue'
+  import AdminActionCard from './components/AdminActionCard.vue'
+  import ReservationCard from './components/ReservationCard.vue'
   import { useUserInfo } from '@/composables/useUserInfo'
   import {
     listConversations,
@@ -50,6 +49,7 @@
     '有什么我可以帮忙的？',
     '从一个问题开始吧。'
   ])
+  welcomeIndex.value = Math.floor(Math.random() * welcomeMessages.value.length)
   const welcomeMessage = computed(() => welcomeMessages.value[welcomeIndex.value])
   const md = new MarkdownIt({ html: false, breaks: true, linkify: true })
   // 保留表格语义，仅让外层容器滚动，避免宽表格撑开聊天区域。
@@ -101,8 +101,7 @@
     enableThinking = ref(false),
     search = ref('')
   const sidebar = ref(window.innerWidth > 800),
-    expanded = ref(false),
-    tall = ref(false)
+    expanded = ref(false)
   const loading = ref(false),
     busy = ref(false),
     listLoading = ref(false),
@@ -110,8 +109,7 @@
     listError = ref(''),
     copied = ref('')
   let copiedTimer
-  const textarea = ref(),
-    mirror = ref(),
+  const composer = ref(),
     scroller = ref(),
     shell = ref()
   const historyScrollbarVisible = ref(false)
@@ -123,12 +121,8 @@
       historyScrollbarVisible.value = false
     }, 800)
   }
-  const expandedHeight = ref(500)
-  const composerHeight = computed(() =>
-    expanded.value ? expandedHeight.value : multiline.value ? inputHeight.value + 82 : 60
-  )
-  const inputHeight = ref(26),
-    pendingDelete = ref(null),
+  const availableHeight = ref(0)
+  const pendingDelete = ref(null),
     deleteDialog = ref(),
     deleting = ref(false)
   const activeId = computed(() => (typeof route.query.c === 'string' ? route.query.c : ''))
@@ -138,7 +132,6 @@
   const filtered = computed(() =>
     conversations.value.filter(c => c.title.toLowerCase().includes(search.value.toLowerCase()))
   )
-  const multiline = computed(() => inputHeight.value > 26 || expanded.value)
   const listPage = ref(1),
     listTotal = ref(0)
   let controller,
@@ -147,21 +140,74 @@
   const cache = new Map()
   const errorText = e =>
     e?.response?.data?.message || e?.message || (typeof e === 'string' ? e : '请求失败，请稍后重试')
+  const isReservationCard = content => {
+    try {
+      return [
+        'reservation_application',
+        'reservation_approval',
+        'reservation_cancellation'
+      ].includes(JSON.parse(content)?.type)
+    } catch {
+      return false
+    }
+  }
+  const isAdminAction = content => {
+    if (typeof content !== 'string') return false
+    try {
+      const type = JSON.parse(content)?.type
+      return (
+        type === 'user_profile_edit' ||
+        (userInfo.value.role === 'admin' && type?.startsWith('admin_user_') === true)
+      )
+    } catch {
+      return false
+    }
+  }
+  const historyList = ref()
+  let listExhausted = false
+  function loadAtBottom() {
+    const list = historyList.value
+    if (
+      !list ||
+      listLoading.value ||
+      listError.value ||
+      listExhausted ||
+      conversations.value.length >= listTotal.value ||
+      search.value.trim()
+    )
+      return
+    if (list.scrollHeight - list.scrollTop - list.clientHeight <= 64) refreshList(true)
+  }
+  function onHistoryScroll() {
+    updateHistoryScrollbar()
+    loadAtBottom()
+  }
   async function refreshList(more = false) {
+    if (listLoading.value) return
+    if (!more) listExhausted = false
     listLoading.value = true
     listError.value = ''
     try {
       const page = more ? listPage.value + 1 : 1
       const data = await listConversations(page)
-      conversations.value = more ? [...conversations.value, ...data.items] : data.items
+      const existing = new Set(more ? conversations.value.map(item => item.id) : [])
+      const added = data.items.filter(item => !existing.has(item.id))
+      listExhausted = added.length === 0
+      conversations.value = more ? [...conversations.value, ...added] : added
       listPage.value = page
       listTotal.value = data.total
     } catch (e) {
       listError.value = errorText(e)
     } finally {
       listLoading.value = false
+      await nextTick()
+      loadAtBottom()
     }
   }
+  watch([sidebar, search], async () => {
+    await nextTick()
+    loadAtBottom()
+  })
   async function loadHistory() {
     cancelScroll()
     messageEntrances.forEach(entrance => entrance.disconnect())
@@ -176,7 +222,7 @@
       loading.value = false
       await nextTick()
       if (version === loadVersion && !activeId.value) {
-        textarea.value?.focus({ preventScroll: true })
+        composer.value?.focus()
       }
       return
     }
@@ -191,18 +237,44 @@
         all.push(...data.items)
       } while (all.length < data.total && data.items.length)
       if (version !== loadVersion) return
-      messages.value = all.filter(m => ['user', 'assistant'].includes(m.role))
+      messages.value = all
+        .filter(m => ['user', 'assistant'].includes(m.role))
+        .map(message => {
+          if (message.role !== 'assistant' || !message.thinking_steps?.length) return message
+          return {
+            ...message,
+            thinking: message.thinking_steps,
+            thinkingVisible: message.thinking_steps,
+            thinkingOpen: false,
+            thinkingTouched: false,
+            thinkingDuration: message.thinking_duration || 1
+          }
+        })
       cache.set(id, messages.value)
       await scrollBottom()
     } catch (e) {
       if (version === loadVersion) error.value = errorText(e)
     } finally {
-      if (version === loadVersion) loading.value = false
+      if (version === loadVersion) {
+        loading.value = false
+        await nextTick()
+        if (version === loadVersion) {
+          composer.value?.focus()
+        }
+      }
     }
+  }
+  function toggleThinking(message) {
+    message.thinkingTouched = true
+    message.thinkingOpen = !message.thinkingOpen
   }
   function select(id = '') {
     if (busy.value) return
-    if (!id) welcomeIndex.value = (welcomeIndex.value + 1) % welcomeMessages.value.length
+    if (!id) {
+      const count = welcomeMessages.value.length
+      welcomeIndex.value =
+        (welcomeIndex.value + 1 + Math.floor(Math.random() * (count - 1))) % count
+    }
     router.replace({ path: '/assistant', query: id ? { c: id } : {} })
     if (!id && !activeId.value) {
       messages.value = []
@@ -211,35 +283,6 @@
       error.value = ''
     }
     if (window.innerWidth <= 800) sidebar.value = false
-  }
-  const inputScrollbarVisible = ref(false)
-  let inputScrollbarTimer
-  function updateInputScrollbar() {
-    clearTimeout(inputScrollbarTimer)
-    const input = textarea.value
-    if (!input || input.scrollHeight <= input.clientHeight + 1) {
-      inputScrollbarVisible.value = false
-      return
-    }
-    inputScrollbarVisible.value = true
-    const atEdge =
-      input.scrollTop <= 1 || input.scrollTop + input.clientHeight >= input.scrollHeight - 1
-    if (atEdge)
-      inputScrollbarTimer = setTimeout(() => {
-        inputScrollbarVisible.value = false
-      }, 2000)
-  }
-  function measure() {
-    if (!mirror.value || !textarea.value) return
-    expandedHeight.value = Math.max(
-      180,
-      shell.value.clientHeight - (window.innerWidth > 800 ? 114 : 106)
-    )
-    mirror.value.style.width = `${textarea.value.clientWidth - parseFloat(getComputedStyle(textarea.value).paddingRight)}px`
-    mirror.value.textContent = `${draft.value || ' '}\n `
-    const height = Math.max(26, mirror.value.scrollHeight - 26)
-    tall.value = height > 104
-    inputHeight.value = Math.min(height, 130)
   }
   const showScrollBottom = ref(false)
   function updateScrollPosition() {
@@ -336,7 +379,20 @@
     expanded.value = false
     busy.value = true
     const user = { id: crypto.randomUUID(), role: 'user', content }
-    const assistant = { id: crypto.randomUUID(), role: 'assistant', content: '', pending: true }
+    const assistant = {
+      id: crypto.randomUUID(),
+      role: 'assistant',
+      content: '',
+      pending: true,
+      thinking: [],
+      thinkingVisible: [],
+      thinkingRevealIndex: 0,
+      thinkingRevealTimer: null,
+      thinkingOpen: false,
+      thinkingTouched: false,
+      thinkingStartedAt: null,
+      thinkingDuration: 0
+    }
     messages.value.push(user, assistant)
     controller = new AbortController()
     let complete = false,
@@ -354,16 +410,57 @@
         (event, data) => {
           const target = messages.value.find(m => m.id === assistant.id)
           if (event === 'start') streamId = data.conversation_id
+          if (event === 'thinking' && target) {
+            if (!target.thinkingStartedAt) {
+              target.thinkingStartedAt = Date.now()
+              if (!target.thinkingTouched) target.thinkingOpen = true
+            }
+            const current = target.thinking.find(step => step.stage === data.stage)
+            if (current) Object.assign(current, data)
+            else target.thinking.push({ ...data })
+            if (!target.thinkingRevealTimer) {
+              const revealNext = () => {
+                if (target.thinkingRevealIndex >= target.thinking.length) {
+                  target.thinkingRevealTimer = null
+                  return
+                }
+                target.thinkingVisible.push(target.thinking[target.thinkingRevealIndex++])
+                target.thinkingRevealTimer = setTimeout(revealNext, 360)
+              }
+              revealNext()
+            }
+            if (data.status === 'complete')
+              target.thinkingDuration = Math.max(
+                1,
+                Math.round((Date.now() - target.thinkingStartedAt) / 1000)
+              )
+          }
           if (event === 'delta' && target) {
+            target.thinkingDuration = Math.max(
+              1,
+              Math.round((Date.now() - target.thinkingStartedAt) / 1000)
+            )
+            if (!target.thinkingTouched) target.thinkingOpen = false
             target.content += data.content
           }
           if (event === 'done') {
             complete = true
+            const thinkingState = target
+              ? {
+                  thinking: target.thinking,
+                  thinkingVisible: target.thinkingVisible,
+                  thinkingRevealIndex: target.thinkingRevealIndex,
+                  thinkingOpen: target.thinkingOpen,
+                  thinkingTouched: target.thinkingTouched,
+                  thinkingStartedAt: target.thinkingStartedAt,
+                  thinkingDuration: target.thinkingDuration || 1
+                }
+              : {}
             messages.value.splice(
               messages.value.length - 2,
               2,
               { ...data.user_message, clientId: user.id },
-              { ...data.assistant_message, clientId: assistant.id }
+              { ...data.assistant_message, clientId: assistant.id, ...thinkingState }
             )
             cache.set(data.conversation_id, [...messages.value])
           }
@@ -391,7 +488,7 @@
         await refreshList()
       }
       await scrollBottom(false)
-      textarea.value?.focus({ preventScroll: true })
+      composer.value?.focus()
     }
   }
   let skipHistory = ''
@@ -402,17 +499,6 @@
     }
     loadHistory()
   })
-  watch(draft, async () => {
-    await nextTick()
-    measure()
-  })
-  function keydown(event) {
-    if (event.key === 'Escape') expanded.value = false
-    if (event.key === 'Enter' && !event.shiftKey && !event.isComposing && event.keyCode !== 229) {
-      event.preventDefault()
-      send()
-    }
-  }
   const feedbackOptions = [
     { value: 'positive', label: '回复优秀', icon: ThumbsUp },
     { value: 'negative', label: '回复不佳', icon: ThumbsDown }
@@ -600,16 +686,16 @@
     shell.value.addEventListener('scroll', dismissMenu, true)
     refreshList()
     loadHistory()
-    observer = new ResizeObserver(measure)
-    observer.observe(textarea.value)
+    observer = new ResizeObserver(() => {
+      availableHeight.value = shell.value.clientHeight
+    })
     observer.observe(shell.value)
-    measure()
+    availableHeight.value = shell.value.clientHeight
   })
   onBeforeUnmount(() => {
     stopReading()
     clearTimeout(copiedTimer)
     clearTimeout(historyScrollbarTimer)
-    clearTimeout(inputScrollbarTimer)
     cancelScroll()
     messageEntrances.forEach(entrance => entrance.disconnect())
     document.removeEventListener('pointerdown', dismissMenu)
@@ -726,58 +812,63 @@
         </Transition>
         <div class="history-heading">最近</div>
         <div
+          ref="historyList"
           class="history-list"
+          :aria-busy="listLoading"
           :class="{ 'scrollbar-visible': historyScrollbarVisible }"
-          @scroll.passive="updateHistoryScrollbar"
+          @scroll.passive="onHistoryScroll"
         >
           <p v-if="listError" class="list-error">
             {{ listError }}
-            <button @click="refreshList()">重新加载</button>
+            <button @click="refreshList(conversations.length > 0)">重新加载</button>
           </p>
-          <p v-else-if="listLoading && !conversations.length" class="empty-history">正在加载…</p>
-          <div v-else-if="!conversations.length" class="history-empty-state">
+          <div v-else-if="!listLoading && !conversations.length" class="history-empty-state">
             <div class="history-empty-icon" aria-hidden="true">
               <MessagesSquare :size="28" :stroke-width="1.5" />
             </div>
             <p class="history-empty-title">暂无历史会话</p>
             <p class="history-empty-description">点击上方「新对话」，开始与AI助手交流。</p>
           </div>
-          <div
-            v-for="item in filtered"
-            :key="item.id"
-            class="history-row"
-            :class="{ active: activeId === item.id, 'menu-open': menuConversation?.id === item.id }"
-          >
-            <button
-              class="history-title"
-              :disabled="busy"
-              :aria-current="activeId === item.id ? 'page' : undefined"
-              @click="select(item.id)"
+          <TransitionGroup name="history-item">
+            <div
+              v-for="item in filtered"
+              :key="item.id"
+              class="history-row"
+              :class="{
+                active: activeId === item.id,
+                'menu-open': menuConversation?.id === item.id
+              }"
             >
-              <span>{{ item.title }}</span>
-            </button>
-            <button
-              class="delete-button icon-button conversation-menu-trigger"
-              :disabled="busy"
-              :aria-label="`对话选项：${item.title}`"
-              aria-haspopup="menu"
-              :aria-expanded="menuConversation?.id === item.id"
-              @click="openMenu(item, $event)"
-            >
-              <Ellipsis :size="18" />
-            </button>
+              <button
+                class="history-title"
+                :disabled="busy"
+                :aria-current="activeId === item.id ? 'page' : undefined"
+                @click="select(item.id)"
+              >
+                <span>{{ item.title }}</span>
+              </button>
+              <button
+                class="delete-button icon-button conversation-menu-trigger"
+                :disabled="busy"
+                :aria-label="`对话选项：${item.title}`"
+                aria-haspopup="menu"
+                :aria-expanded="menuConversation?.id === item.id"
+                @click="openMenu(item, $event)"
+              >
+                <Ellipsis :size="18" />
+              </button>
+            </div>
+          </TransitionGroup>
+          <div v-if="listLoading" class="history-skeleton" role="status" aria-label="正在加载会话">
+            <span v-for="index in 3" :key="index" aria-hidden="true"></span>
           </div>
-          <p v-if="search && conversations.length && !filtered.length" class="empty-history">
-            没有找到相关对话
-          </p>
-          <button
-            v-if="conversations.length < listTotal"
-            class="load-more"
-            :disabled="listLoading"
-            @click="refreshList(true)"
+          <div
+            v-if="search && conversations.length && !filtered.length"
+            class="history-search-empty"
           >
-            {{ listLoading ? '正在加载…' : '加载更多' }}
-          </button>
+            <Search :size="30" :stroke-width="1.7" aria-hidden="true" />
+            <span>无结果</span>
+          </div>
         </div>
       </div>
     </aside>
@@ -813,15 +904,61 @@
                   <img class="assistant-avatar" :src="aiLogo" alt="" aria-hidden="true" />
                   <span>AI助手</span>
                 </div>
-                <StreamingMarkdown
-                  v-if="message.content || message.pending"
+                <div
+                  v-if="message.thinking?.length"
+                  class="thinking-panel"
+                  :class="{ open: message.thinkingOpen }"
+                >
+                  <button
+                    type="button"
+                    class="thinking-toggle"
+                    :aria-expanded="message.thinkingOpen"
+                    @click="toggleThinking(message)"
+                  >
+                    <ThinkingIndicator v-if="message.pending" label="正在思考…" />
+                    <span v-else>思考了 {{ message.thinkingDuration || 1 }} 秒</span>
+                    <ChevronDown :size="16" class="thinking-chevron" aria-hidden="true" />
+                  </button>
+                  <Transition name="thinking-collapse">
+                    <div v-show="message.thinkingOpen" class="thinking-details">
+                      <TransitionGroup name="thinking-step" tag="ol" class="thinking-steps">
+                        <li
+                          v-for="step in message.thinkingVisible || message.thinking"
+                          :key="step.stage"
+                          :class="step.status"
+                        >
+                          <span class="thinking-dot" aria-hidden="true" />
+                          {{ step.label }}
+                        </li>
+                      </TransitionGroup>
+                    </div>
+                  </Transition>
+                </div>
+                <Transition name="admin-card">
+                  <AdminActionCard
+                    v-if="isAdminAction(message.content)"
+                    :content="message.content"
+                  />
+                </Transition>
+                <ReservationCard
+                  v-if="isReservationCard(message.content)"
                   :content="message.content"
-                  :pending="!!message.pending"
-                  :render-markdown="text => md.render(text)"
-                  @progress="scrollBottom(false)"
-                  @settled="scrollBottom(false)"
                 />
-                <ThinkingIndicator v-if="!message.content && message.pending" />
+                <template
+                  v-if="!isAdminAction(message.content) && !isReservationCard(message.content)"
+                >
+                  <StreamingMarkdown
+                    v-if="message.content || message.pending"
+                    :content="message.content"
+                    :pending="!!message.pending"
+                    :render-markdown="text => md.render(text)"
+                    @progress="scrollBottom(false)"
+                    @settled="scrollBottom(false)"
+                  />
+                </template>
+                <ThinkingIndicator
+                  v-if="!message.content && message.pending && !message.thinking?.length"
+                />
                 <p v-if="message.failed" class="failed">本次回复未保存</p>
                 <div v-if="message.content && !message.pending" class="reply-actions">
                   <button
@@ -935,80 +1072,20 @@
               <X :size="16" />
             </button>
           </div>
-          <form
-            class="composer"
-            :class="{ multiline, expanded }"
-            :style="{ height: `${composerHeight}px` }"
-            @submit.prevent="send"
-          >
-            <button
-              v-if="tall || expanded"
-              type="button"
-              class="expand-button icon-button"
-              :aria-label="expanded ? '收起输入框' : '展开输入框'"
-              :aria-expanded="expanded"
-              @click="expanded = !expanded"
-            >
-              <Minimize2 v-if="expanded" :size="18" />
-              <Maximize2 v-else :size="18" />
-            </button>
-            <textarea
-              ref="textarea"
-              v-model="draft"
-              aria-label="发送消息给 Lab Agent"
-              placeholder="询问你想解决的问题"
-              rows="1"
-              :style="{ height: expanded ? `${expandedHeight - 84}px` : `${inputHeight}px` }"
-              :disabled="loading"
-              :class="{ 'scrollbar-visible': inputScrollbarVisible }"
-              @scroll="updateInputScrollbar"
-              @wheel.passive="updateInputScrollbar"
-              @touchmove.passive="updateInputScrollbar"
-              @input="updateInputScrollbar"
-              @keydown="keydown"
-            />
-            <div class="composer-toolbar">
-              <button
-                type="button"
-                class="thinking-toggle"
-                :class="{ active: enableThinking }"
-                :aria-pressed="enableThinking"
-                aria-describedby="thinking-tooltip"
-                @click="enableThinking = !enableThinking"
-              >
-                <Brain :size="19" aria-hidden="true" />
-                <span>思考</span>
-                <span id="thinking-tooltip" class="thinking-tooltip" role="tooltip">
-                  获取更智能的回答
-                </span>
-              </button>
-              <span
-                v-if="draft.length > 18000"
-                class="character-count"
-                :class="{ exceeded: draft.length > 20000 }"
-              >
-                {{ draft.length }} / 20000
-              </span>
-              <button
-                v-if="busy"
-                type="button"
-                class="send-button"
-                aria-label="停止生成"
-                @click="controller?.abort()"
-              >
-                <Square :size="16" fill="currentColor" />
-              </button>
-              <button
-                v-else
-                type="submit"
-                class="send-button"
-                aria-label="发送消息"
-                :disabled="!draft.trim() || loading || draft.length > 20000"
-              >
-                <ArrowUp :size="22" />
-              </button>
-            </div>
-          </form>
+          <ChatComposer
+            ref="composer"
+            v-model="draft"
+            v-model:thinking="enableThinking"
+            v-model:expanded="expanded"
+            class="assistant-composer"
+            placeholder="询问你想解决的问题"
+            aria-label="发送消息给 Lab Agent"
+            :disabled="loading"
+            :busy="busy"
+            :available-height="availableHeight"
+            @send="send"
+            @stop="controller?.abort()"
+          />
         </div>
       </div>
     </div>
@@ -1033,7 +1110,6 @@
         </button>
       </div>
     </Transition>
-    <div ref="mirror" class="text-mirror" aria-hidden="true" />
     <dialog ref="deleteDialog" class="delete-dialog" @cancel="cancelDelete">
       <h2>删除对话？</h2>
       <p>“{{ pendingDelete?.title }}”将被永久删除。</p>
@@ -1309,6 +1385,35 @@
     color: var(--muted);
     padding: 10px 12px 10px;
   }
+  .history-item-enter-active {
+    transition:
+      opacity 0.25s ease,
+      transform 0.25s ease;
+  }
+  .history-item-enter-from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  .history-skeleton {
+    display: grid;
+    gap: 25px;
+    padding: 15px 12px;
+  }
+  .history-skeleton span {
+    display: block;
+    width: 82%;
+    height: 14px;
+    border-radius: 999px;
+    background: linear-gradient(100deg, var(--hover) 25%, var(--line) 50%, var(--hover) 75%);
+    background-size: 250% 100%;
+    animation: conversation-shimmer 1.6s ease-in-out infinite;
+  }
+  .history-skeleton span:nth-child(2) {
+    width: 66%;
+  }
+  .history-skeleton span:nth-child(3) {
+    width: 86%;
+  }
   .history-list {
     --history-scrollbar-thumb: transparent;
     flex: 1;
@@ -1320,6 +1425,19 @@
     scrollbar-width: thin;
     scrollbar-color: var(--history-scrollbar-thumb) transparent;
     transition: --history-scrollbar-thumb 0.25s ease;
+  }
+  .history-search-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    min-height: 100%;
+    color: var(--sidebar-text);
+    font-size: 20px;
+    font-weight: 400;
+  }
+  .history-search-empty svg {
+    flex: 0 0 auto;
   }
   .history-list.scrollbar-visible {
     --history-scrollbar-thumb: var(--input-scrollbar);
@@ -1601,6 +1719,19 @@
     position: relative;
     padding-left: 42px;
   }
+  .admin-card-enter-active {
+    transition:
+      opacity 0.28s ease,
+      transform 0.28s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .admin-card-enter-from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  .admin-card-enter-to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
   .assistant-avatar {
     position: absolute;
     top: 0;
@@ -1617,6 +1748,102 @@
     font-size: 16px;
     font-weight: 600;
     margin-bottom: 12px;
+  }
+  .thinking-panel {
+    width: min(100%, 560px);
+    margin: 0 0 12px;
+    color: var(--muted);
+    overflow: hidden;
+  }
+  .thinking-panel > .thinking-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: fit-content;
+    padding: 10px 0;
+    text-align: left;
+    color: inherit;
+    cursor: pointer;
+    background: transparent;
+  }
+  .thinking-panel > .thinking-toggle:hover,
+  .thinking-panel > .thinking-toggle:focus-visible {
+    background: transparent;
+  }
+  .thinking-chevron {
+    transform: rotate(-90deg);
+    transform-origin: center;
+    transition: transform 0.22s ease;
+  }
+  .thinking-panel.open .thinking-chevron {
+    transform: rotate(0deg);
+  }
+  .thinking-details {
+    padding: 10px 12px;
+    border-radius: 18px;
+    background: var(--input-bg);
+  }
+  .thinking-steps {
+    margin: 0;
+    padding: 0 12px 0 16px;
+    list-style: none;
+  }
+  .thinking-steps li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 0;
+    font-size: 13px;
+  }
+  .thinking-dot {
+    width: 6px;
+    height: 6px;
+    flex: 0 0 6px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  .thinking-steps li.running .thinking-dot {
+    animation: thinking-pulse 1.1s ease-in-out infinite;
+  }
+  .thinking-step-enter-active {
+    transition:
+      opacity 0.34s cubic-bezier(0.22, 1, 0.36, 1),
+      transform 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .thinking-step-enter-from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+  .thinking-step-enter-to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  .thinking-collapse-enter-active,
+  .thinking-collapse-leave-active {
+    overflow: hidden;
+    transition:
+      max-height 0.24s ease,
+      opacity 0.18s ease,
+      transform 0.24s ease;
+  }
+  .thinking-collapse-enter-from,
+  .thinking-collapse-leave-to {
+    max-height: 0;
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  .thinking-collapse-enter-to,
+  .thinking-collapse-leave-from {
+    max-height: 180px;
+    opacity: 1;
+    transform: translateY(0);
+  }
+  @keyframes thinking-pulse {
+    50% {
+      opacity: 0.35;
+      transform: scale(0.72);
+    }
   }
   .reply-actions {
     display: flex;
@@ -1764,222 +1991,18 @@
     margin: 0 auto;
     flex-shrink: 0;
   }
-  .composer {
-    background: var(--input-bg);
-    border: 1px solid var(--line);
-    border-radius: 30px;
-    position: relative;
-    padding: 14px 158px 14px 22px;
-    display: flex;
-    align-items: center;
-    min-height: 60px;
-    transition:
-      height 0.38s cubic-bezier(0.22, 0.7, 0.25, 1),
-      border-radius 0.3s,
-      padding 0.3s,
-      border-color 0.25s ease,
-      box-shadow 0.25s ease;
-    box-shadow: 0 2px 6px #00000003;
-  }
-  .composer:focus-within {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent);
-  }
-  .composer textarea,
-  .text-mirror {
-    font-size: 15px;
-    line-height: 26px;
-    letter-spacing: normal;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-    word-break: break-word;
-    padding: 0;
-    border: 0;
-  }
-  .composer textarea {
-    display: block;
-    resize: none;
-    width: 100%;
-    background: none;
-    color: inherit;
-    outline: 0;
-    min-height: 26px;
-    overflow-y: auto;
-    transition: height 0.38s cubic-bezier(0.22, 0.7, 0.25, 1);
-  }
-  .composer textarea {
-    scrollbar-width: thin;
-    scrollbar-color: transparent transparent;
-  }
-  @supports selector(::-webkit-scrollbar) {
-    .composer textarea {
-      scrollbar-width: auto;
-      scrollbar-color: auto;
-    }
-  }
-  .composer textarea::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-  .composer textarea::-webkit-scrollbar-track {
-    background: transparent;
-    margin-block: 32px 4px;
-  }
-  .composer textarea::-webkit-scrollbar-thumb {
-    background: transparent;
-    border-radius: 999px;
-  }
-  .composer textarea.scrollbar-visible {
-    scrollbar-color: var(--input-scrollbar) transparent;
-  }
-  @supports selector(::-webkit-scrollbar) {
-    .composer textarea.scrollbar-visible {
-      scrollbar-color: auto;
-    }
-  }
-  .composer textarea.scrollbar-visible::-webkit-scrollbar-thumb {
-    background: var(--input-scrollbar);
-  }
-  .composer textarea.scrollbar-visible::-webkit-scrollbar-thumb:hover {
-    background: var(--input-scrollbar-hover);
-  }
-  .composer textarea::-webkit-scrollbar-button {
-    display: none;
-    width: 0;
-    height: 0;
-  }
-  .composer textarea::-webkit-scrollbar-corner {
-    background: transparent;
-  }
-  .composer textarea::placeholder {
-    color: var(--muted);
-  }
-  .composer-toolbar {
-    position: absolute;
-    right: 10px;
-    bottom: 10px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-  .send-button {
-    height: 38px;
-    width: 38px;
-    border-radius: 50%;
-    background: var(--accent);
-    color: #fff;
-    border: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .thinking-toggle {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 7px;
-    height: 38px;
-    padding: 0 13px;
-    border: 0;
-    border-radius: 999px;
-    background: transparent;
-    color: var(--muted);
-    font-size: 14px;
-    white-space: nowrap;
-    transition:
-      color 0.2s ease,
-      background-color 0.2s ease;
-  }
-  .thinking-toggle:hover {
-    background: var(--hover);
-  }
-  .thinking-toggle.active {
-    background: color-mix(in srgb, var(--accent) 13%, var(--input-bg));
-    color: var(--accent);
-  }
-  .thinking-tooltip {
-    position: absolute;
-    bottom: calc(100% + 10px);
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 5;
-    padding: 8px 14px;
-    border-radius: 999px;
-    background: #111;
-    color: #fff;
-    font-size: 14px;
-    font-weight: 600;
-    line-height: 22px;
-    box-shadow: 0 8px 24px #0003;
-    pointer-events: none;
-    visibility: hidden;
-    opacity: 0;
-    transition:
-      opacity 0.15s ease,
-      visibility 0.15s ease;
-  }
-  .thinking-toggle:hover .thinking-tooltip,
-  .thinking-toggle:focus-visible .thinking-tooltip {
-    visibility: visible;
-    opacity: 1;
-  }
-  .send-button:hover:not(:disabled) {
-    background: var(--accent-hover);
-  }
-  .send-button:disabled {
-    background: var(--chat-text);
-    color: var(--chat-bg);
-    opacity: 0.2;
-  }
-  .composer.multiline {
-    display: block;
-    padding: 18px 18px 62px 22px;
-    border-radius: 24px;
-  }
-  .multiline .composer-toolbar {
-    left: 20px;
-    right: 10px;
-    justify-content: flex-end;
-  }
-  .input-hint {
-    font-size: 11px;
-    color: var(--muted);
-    margin-right: auto;
-  }
-  .multiline textarea {
-    padding-right: 42px;
-  }
-  .expand-button {
-    border-radius: 50%;
-    position: absolute;
-    right: 10px;
-    top: 8px;
-    z-index: 1;
-    color: var(--muted);
-  }
-  .character-count {
-    font-size: 10px;
-    color: var(--muted);
-  }
-  .exceeded {
-    color: #c65c58;
-  }
-
-  .composer.expanded {
-    padding-bottom: 64px;
+  .assistant-composer {
+    --composer-background: var(--input-bg);
+    --composer-border: var(--line);
+    --composer-accent: var(--accent);
+    --composer-text: var(--chat-text);
+    --composer-surface: var(--chat-bg);
+    --composer-muted: var(--muted);
+    --composer-hover: var(--hover);
+    --composer-scrollbar: var(--input-scrollbar);
   }
   .chat-body.expanded {
     padding-bottom: 0;
-  }
-
-  .text-mirror {
-    position: absolute;
-    left: -100000px;
-    top: 0;
-    visibility: hidden;
-    height: auto;
-    pointer-events: none;
   }
   .error-banner {
     display: flex;
@@ -2292,9 +2315,6 @@
     .export-button span {
       display: none;
     }
-    .composer textarea {
-      font-size: 16px;
-    }
     .input-hint {
       font-size: 10px;
     }
@@ -2306,5 +2326,28 @@
       animation: none !important;
       transition: none !important;
     }
+  }
+
+  /* Thinking controls stay left-aligned and transparent in every state. */
+  .thinking-panel > .thinking-toggle,
+  .thinking-panel > .thinking-toggle:hover,
+  .thinking-panel > .thinking-toggle:focus-visible,
+  .thinking-panel > .thinking-toggle.active {
+    display: flex;
+    justify-content: flex-start;
+    width: fit-content;
+    height: auto;
+    min-height: 38px;
+    padding: 10px 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent !important;
+    color: var(--muted);
+    text-align: left;
+    transform: none;
+    transition: color 0.2s ease;
+  }
+  .thinking-panel > .thinking-details {
+    background: transparent;
   }
 </style>

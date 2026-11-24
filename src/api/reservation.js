@@ -16,3 +16,27 @@ export function updateReservationStatus(id, status) {
     data: { status }
   })
 }
+
+export function confirmReservationApplication(token) {
+  return request({
+    method: 'POST',
+    url: '/api/v1/reservation/confirm-application',
+    data: { token }
+  })
+}
+
+export function confirmReservationApproval(token, decision) {
+  return request({
+    method: 'POST',
+    url: '/api/v1/reservation/confirm-approval',
+    data: { token, decision }
+  })
+}
+
+export function confirmReservationCancellation(token) {
+  return request({
+    method: 'POST',
+    url: '/api/v1/reservation/confirm-cancellation',
+    data: { token }
+  })
+}

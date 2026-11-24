@@ -400,20 +400,22 @@
             </button>
           </div>
         </header>
-        <ul v-if="resources?.length" class="resource-grid">
-          <ResourceCard
-            v-for="item in resources"
-            :key="resource + ':' + item.id"
-            :item="item"
-            :equipment="resource === 'equipment'"
-            :lab-name="labData?.items.find(lab => lab.id === item.lab_id)?.name"
-            :can-reserve="!admin && resource === 'labs'"
-            @reserve="selected = item"
-          />
-        </ul>
-        <p v-else class="placeholder">
-          {{ loading ? '正在读取资源…' : resources ? '暂未登记资源' : '暂时无法读取资源' }}
-        </p>
+        <Transition name="resource-switch" mode="out-in">
+          <ul v-if="resources?.length" :key="resource" class="resource-grid">
+            <ResourceCard
+              v-for="item in resources"
+              :key="resource + ':' + item.id"
+              :item="item"
+              :equipment="resource === 'equipment'"
+              :lab-name="labData?.items.find(lab => lab.id === item.lab_id)?.name"
+              :can-reserve="!admin && resource === 'labs'"
+              @reserve="selected = item"
+            />
+          </ul>
+          <p v-else class="placeholder">
+            {{ loading ? '正在读取资源…' : resources ? '暂未登记资源' : '暂时无法读取资源' }}
+          </p>
+        </Transition>
         <footer class="panel-foot">
           <RouterLink
             v-if="resource === 'labs' || admin"
@@ -500,7 +502,10 @@
     scale: 1;
     transition:
       translate 0.24s ease,
-      scale 0.2s ease;
+      scale 0.2s ease,
+      transform 0.3s cubic-bezier(0.2, 0.7, 0.3, 1),
+      box-shadow 0.3s ease,
+      border-color 0.3s ease;
   }
   .liquid-card::before,
   .liquid-card::after {
@@ -602,6 +607,20 @@
   .welcome,
   .message,
   .panel-foot,
+  .resource-switch-enter-active,
+  .resource-switch-leave-active {
+    transition:
+      opacity 180ms ease,
+      transform 220ms ease;
+  }
+  .resource-switch-enter-from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  .resource-switch-leave-to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
   .placeholder {
     color: var(--muted);
     font-size: 13px;
@@ -812,6 +831,20 @@
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 12px;
+  }
+  .resource-switch-enter-active,
+  .resource-switch-leave-active {
+    transition:
+      opacity 180ms ease,
+      transform 220ms ease;
+  }
+  .resource-switch-enter-from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  .resource-switch-leave-to {
+    opacity: 0;
+    transform: translateY(-4px);
   }
   .placeholder {
     padding-block: 24px;
